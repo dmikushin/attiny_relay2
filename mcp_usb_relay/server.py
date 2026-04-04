@@ -165,5 +165,9 @@ def relay_set_name(device: str, name: str) -> str:
     return f"Name written but device did not reappear within timeout."
 
 
-if __name__ == "__main__":
+def main():
     server.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

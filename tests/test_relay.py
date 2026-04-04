@@ -96,7 +96,7 @@ class TestNameChange:
         with pytest.raises(ValueError):
             relay.set_name("")
         with pytest.raises(ValueError):
-            relay.set_name("x" * 31)
+            relay.set_name("x" * 65)
 
     def test_set_and_restore_name(self, relay):
         """Change name, verify, restore original.

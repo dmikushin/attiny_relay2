@@ -10,4 +10,4 @@ clean:
 	$(MAKE) -C firmware clean
 
 test:
-	python3 -m pytest python/tests/ -v
+	python3 -m pytest tests/ -v

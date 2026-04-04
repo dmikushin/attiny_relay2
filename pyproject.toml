@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "usb-relay"
+version = "1.0.0"
+description = "ATtiny85 CDC ACM USB relay controller — Python API and MCP server"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Dmitry Mikushin", email = "dmitry@kernelgen.org" },
+]
+dependencies = [
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+mcp = [
+    "mcp>=1.0",
+]
+
+[project.scripts]
+usb-relay-mcp = "mcp_usb_relay.server:main"
+
+[tool.setuptools.packages.find]
+include = ["relay_control*", "mcp_usb_relay*"]
