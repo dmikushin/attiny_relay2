@@ -24,7 +24,7 @@ PID = 0x05E1
 
 # Command protocol
 CMD_SET_NAME = 0xAA
-NAME_MAX_LEN = 30
+NAME_MAX_LEN = 64
 
 
 def _read_sysfs(tty_path, attr):

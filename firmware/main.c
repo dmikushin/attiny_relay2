@@ -32,7 +32,7 @@
 #define EE_NAMELEN_ADDR  ((uint8_t *)1)
 #define EE_NAME_ADDR     ((uint8_t *)2)
 #define EE_MAGIC_VAL     0xA5
-#define NAME_MAX         30
+#define NAME_MAX         64
 
 /* ---- CDC ACM class request codes ---- */
 #define CDC_SET_LINE_CODING         0x20
