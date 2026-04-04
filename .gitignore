@@ -1,0 +1,21 @@
+# Build artifacts
+firmware/*.o
+firmware/*.elf
+firmware/*.hex
+firmware/v-usb/usbdrv/*.o
+
+# V-USB library (cloned during build)
+firmware/v-usb/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Agentura
+.agentura/
