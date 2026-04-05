@@ -9,6 +9,7 @@ Tools:
   relay_set_name  — change USB device name (stored in EEPROM)
 """
 
+import atexit
 import glob
 import os
 import time
@@ -21,6 +22,33 @@ CMD_SET_NAME = 0xAA
 NAME_MAX_LEN = 64
 
 server = FastMCP("mcp-usb-relay", "USB relay controller for ATtiny85 DigiSpark devices")
+
+# Keep serial ports open so the break condition (relay state) is preserved.
+# Closing the port causes the kernel cdc-acm driver to clear the break signal,
+# which resets the relay to ON — the "sticking relay" bug.
+_open_ports: dict[str, serial.Serial] = {}
+
+
+def _get_serial(port: str) -> serial.Serial:
+    """Get or open a cached serial connection for a port."""
+    s = _open_ports.get(port)
+    if s is not None and s.is_open:
+        return s
+    s = serial.Serial(port, 9600, timeout=1)
+    _open_ports[port] = s
+    return s
+
+
+def _close_all_ports():
+    for s in _open_ports.values():
+        try:
+            s.close()
+        except Exception:
+            pass
+    _open_ports.clear()
+
+
+atexit.register(_close_all_ports)
 
 
 def _sysfs_attr(tty_dev, attr):
@@ -107,9 +135,8 @@ def relay_on(device: str) -> str:
         device: Serial port (e.g. /dev/ttyACM1) or USB address (e.g. 1-2).
     """
     port = _resolve_device(device)
-    s = serial.Serial(port, 9600, timeout=1)
+    s = _get_serial(port)
     s.break_condition = False
-    s.close()
     return f"Relay ON: {port}"
 
 
@@ -121,9 +148,8 @@ def relay_off(device: str) -> str:
         device: Serial port (e.g. /dev/ttyACM1) or USB address (e.g. 1-2).
     """
     port = _resolve_device(device)
-    s = serial.Serial(port, 9600, timeout=1)
+    s = _get_serial(port)
     s.break_condition = True
-    s.close()
     return f"Relay OFF: {port}"
 
 
@@ -140,12 +166,17 @@ def relay_set_name(device: str, name: str) -> str:
     port = _resolve_device(device)
     name_bytes = name.encode("ascii")
 
-    s = serial.Serial(port, 9600, timeout=1)
+    s = _get_serial(port)
     cmd = bytes([CMD_SET_NAME, len(name_bytes)]) + name_bytes
     s.write(cmd)
     s.flush()
     old_port = port
-    s.close()
+    # Device will reboot — close and remove from cache
+    try:
+        s.close()
+    except Exception:
+        pass
+    _open_ports.pop(port, None)
 
     # Wait for device to disappear and reappear
     deadline = time.monotonic() + 3
