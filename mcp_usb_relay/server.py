@@ -2,10 +2,72 @@
 """
 MCP server for ATtiny85 CDC ACM USB relay control.
 
+================================================================================
+HOW THE RELAY API WORKS — read this before calling relay_on / relay_off.
+================================================================================
+
+The ATtiny85 controller is wired the same way for every relay it controls:
+
+    relay_on  →  PB0 HIGH  (signal asserted)
+    relay_off →  PB0 LOW   (signal released, default at power-up)
+
+The PB0 signal is then routed to the relay coil. Whether HIGH or LOW
+energizes the coil depends on the driver circuit, but the OBSERVABLE
+result depends on the relay TYPE printed on the device's name:
+
+    Normally OPEN (NO) relay   — at PB0 LOW the circuit is OPEN.
+                                 At PB0 HIGH the circuit is CLOSED.
+    Normally CLOSED (NC) relay — at PB0 LOW the circuit is CLOSED.
+                                 At PB0 HIGH the circuit is OPEN.
+
+"Normally" means "the state when the controller signal is LOW", which is
+also the state at ATtiny power-up. The HIGH state is the inverse.
+
+API → physical effect TRUTH TABLE:
+
+    +-----------+-----+--------------------------+--------------------------+
+    | API call  | PB0 | Normally OPEN relay      | Normally CLOSED relay    |
+    +-----------+-----+--------------------------+--------------------------+
+    | relay_off | LOW | circuit OPEN             | circuit CLOSED           |
+    | relay_on  | HIGH| circuit CLOSED           | circuit OPEN             |
+    +-----------+-----+--------------------------+--------------------------+
+
+The relay TYPE is in the USB product name, e.g.:
+    "Vive Flow USB cable: VCC ON/OFF Relay (normally closed)"
+    "Vive Flow USB cable: Deep Flash Button Relay (normally open)"
+
+USE CASE: HTC Vive Flow EDL deep flash cable
+    • VCC relay (Normally Closed) — interrupts +5V on the USB cable.
+        relay_off(VCC)  → LOW  → NC closed → power flows  → device ON
+        relay_on(VCC)   → HIGH → NC open   → power cut    → device OFF
+    • Deep Flash relay (Normally Open) — shorts USB D+ to GND.
+        relay_off(DF)   → LOW  → NO open   → D+ free      → normal USB
+        relay_on(DF)    → HIGH → NO closed → D+→GND short → EDL trigger
+
+    Power-cycle into EDL mode:
+        1. relay_on(VCC)        # power off (NC opened)
+        2. wait 5s
+        3. relay_on(DF)         # short D+ to GND (NO closed)
+        4. wait 1s
+        5. relay_off(VCC)       # power on (NC closed again)
+        6. wait 3s              # SoC samples D+ at boot, enters EDL
+        7. relay_off(DF)        # release D+ for USB enumeration
+
+    Safe rest state for normal device operation:
+        relay_off(VCC) + relay_off(DF)
+        → power flows, D+ free, device boots Android normally
+
+PERSISTENCE: closing the serial port resets PB0 to LOW (the cdc-acm
+kernel driver clears the BREAK signal on close). This MCP server keeps
+the serial connection open in `_open_ports` to preserve the asserted
+state. Do NOT close the port between commands.
+
+================================================================================
+
 Tools:
-  relay_list      — list connected relay devices
-  relay_on        — turn relay ON (PB0 LOW, conducting)
-  relay_off       — turn relay OFF (PB0 HIGH, open)
+  relay_list      — list connected relay devices (and their NO/NC type)
+  relay_on        — drive PB0 HIGH (see truth table above)
+  relay_off       — drive PB0 LOW  (default state)
   relay_set_name  — change USB device name (stored in EEPROM)
 """
 
@@ -129,7 +191,13 @@ def relay_list() -> str:
 
 @server.tool()
 def relay_on(device: str) -> str:
-    """Turn relay ON (PB0 LOW, conducting). Accepts serial port path or USB address.
+    """Drive PB0 HIGH on the controller.
+
+    Effect on the relay (depends on type printed in the USB name):
+      • Normally OPEN  → circuit CLOSED (contacts engage)
+      • Normally CLOSED → circuit OPEN  (contacts disengage)
+
+    See module docstring for the full truth table and Vive Flow EDL example.
 
     Args:
         device: Serial port (e.g. /dev/ttyACM1) or USB address (e.g. 1-2).
@@ -142,7 +210,13 @@ def relay_on(device: str) -> str:
 
 @server.tool()
 def relay_off(device: str) -> str:
-    """Turn relay OFF (PB0 HIGH, open). Accepts serial port path or USB address.
+    """Drive PB0 LOW on the controller (default state at ATtiny power-up).
+
+    Effect on the relay (depends on type printed in the USB name):
+      • Normally OPEN  → circuit OPEN   (rest state)
+      • Normally CLOSED → circuit CLOSED (rest state)
+
+    See module docstring for the full truth table and Vive Flow EDL example.
 
     Args:
         device: Serial port (e.g. /dev/ttyACM1) or USB address (e.g. 1-2).
