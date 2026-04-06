@@ -23,6 +23,7 @@ mcp = [
 
 [project.scripts]
 usb-relay-mcp = "mcp_usb_relay.server:main"
+lsrelay = "relay_control.lsrelay:main"
 
 [tool.setuptools.packages.find]
 include = ["relay_control*", "mcp_usb_relay*"]
